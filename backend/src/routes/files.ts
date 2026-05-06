@@ -7,7 +7,10 @@ import {
   listFiles,
   uploadFile,
   deleteFile,
+  listSheets,
   getSheet,
+  exportFile,
+  updateCell,
 } from '../controllers/filesController'
 
 const upload = multer({
@@ -34,4 +37,7 @@ filesRouter.use(authenticate)
 filesRouter.get('/', listFiles)
 filesRouter.post('/', upload.single('file'), uploadFile)
 filesRouter.delete('/:id', deleteFile)
+filesRouter.get('/:id/sheets', listSheets)
 filesRouter.get('/:id/sheets/:sheetName', getSheet)
+filesRouter.get('/:id/export', exportFile)
+filesRouter.patch('/:id/sheets/:sheetName/cells', updateCell)

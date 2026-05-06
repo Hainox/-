@@ -29,4 +29,23 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export const api = { request }
+async function requestBlob(path: string, options?: RequestInit): Promise<{ blob: Blob; filename: string }> {
+  const token = tokenStore.get()
+  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: { ...authHeader, ...options?.headers },
+    ...options,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.message ?? `HTTP ${res.status}`)
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match ? decodeURIComponent(match[1]) : 'export.xlsx'
+  const blob = await res.blob()
+  return { blob, filename }
+}
+
+export const api = { request, requestBlob }

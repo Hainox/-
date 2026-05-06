@@ -1,6 +1,6 @@
-import { useReducer, useEffect, useCallback } from 'react'
+import { useReducer, useEffect, useCallback, useState } from 'react'
 import { filesApi } from '../api/files'
-import type { Sheet } from '../types/spreadsheet'
+import type { Sheet, Row } from '../types/spreadsheet'
 
 interface State {
   sheet: Sheet | null
@@ -28,17 +28,23 @@ interface UseSheetResult {
   sheet: Sheet | null
   loading: boolean
   error: string | null
+  rows: Row[]
+  setRows: React.Dispatch<React.SetStateAction<Row[]>>
 }
 
 export function useSheet(fileId: string, sheetName: string): UseSheetResult {
   const [state, dispatch] = useReducer(reducer, { sheet: null, loading: true, error: null })
+  const [rows, setRows] = useState<Row[]>([])
 
   const fetchSheet = useCallback(
     (signal: AbortSignal) =>
       filesApi
         .getSheet(fileId, sheetName)
         .then((sheet) => {
-          if (!signal.aborted) dispatch({ type: 'SUCCESS', sheet })
+          if (!signal.aborted) {
+            dispatch({ type: 'SUCCESS', sheet })
+            setRows(sheet.rows)
+          }
         })
         .catch((e: unknown) => {
           if (!signal.aborted)
@@ -50,9 +56,10 @@ export function useSheet(fileId: string, sheetName: string): UseSheetResult {
   useEffect(() => {
     const controller = new AbortController()
     dispatch({ type: 'FETCHING' })
+    setRows([])
     fetchSheet(controller.signal)
     return () => controller.abort()
   }, [fetchSheet])
 
-  return state
+  return { ...state, rows, setRows }
 }

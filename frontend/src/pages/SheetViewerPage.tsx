@@ -1,18 +1,51 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSheet } from '../hooks/useSheet'
+import { useSheets } from '../hooks/useSheets'
 import { TableView } from '../components/TableView'
+import { ChartView } from '../components/ChartView'
 import { Spinner } from '../components/Spinner'
 import { Button } from '../components/Button'
+import { filesApi } from '../api/files'
+import type { CellValue } from '../types/spreadsheet'
 
 export function SheetViewerPage() {
-  const { fileId = '', sheetName = 'Sheet1' } = useParams<{
+  const { fileId = '', sheetName = '' } = useParams<{
     fileId: string
     sheetName?: string
   }>()
   const navigate = useNavigate()
-  const { sheet, loading, error } = useSheet(fileId, sheetName)
-  const [tab, setTab] = useState<'table' | 'info'>('table')
+  const { sheets, loading: sheetsLoading } = useSheets(fileId)
+  const activeSheet = sheetName || sheets[0] || 'Sheet1'
+  const { sheet, loading, error, rows, setRows } = useSheet(fileId, activeSheet)
+  const [tab, setTab] = useState<'table' | 'chart' | 'info'>('table')
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  async function handleExport() {
+    setExporting(true)
+    setExportError(null)
+    try {
+      await filesApi.exportFile(fileId)
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'Ошибка экспорта')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleCellEdit = useCallback(
+    async (rowIndex: number, colKey: string, value: CellValue) => {
+      // row 1 is header, data starts at row 2
+      const excelRow = rowIndex + 2
+      const excelCol = Number(colKey)
+      await filesApi.updateCell(fileId, activeSheet, excelRow, excelCol, value)
+      setRows((prev) =>
+        prev.map((r, i) => (i === rowIndex ? { ...r, [colKey]: value } : r)),
+      )
+    },
+    [fileId, activeSheet, setRows],
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,7 +69,7 @@ export function SheetViewerPage() {
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="font-semibold text-gray-900 truncate">
-            {sheet?.name ?? sheetName}
+            {sheet?.name ?? activeSheet}
           </h1>
           {sheet && (
             <p className="text-xs text-gray-400">
@@ -44,12 +77,42 @@ export function SheetViewerPage() {
             </p>
           )}
         </div>
+
+        {/* Sheet selector */}
+        {!sheetsLoading && sheets.length > 1 && (
+          <select
+            value={activeSheet}
+            onChange={(e) =>
+              navigate(`/files/${fileId}/sheets/${encodeURIComponent(e.target.value)}`)
+            }
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {sheets.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Export button */}
+        <Button variant="secondary" onClick={handleExport} disabled={exporting}>
+          {exporting ? 'Скачивание...' : 'Скачать .xlsx'}
+        </Button>
+
+        {/* Tab buttons */}
         <div className="flex gap-2">
           <Button
             variant={tab === 'table' ? 'primary' : 'secondary'}
             onClick={() => setTab('table')}
           >
             Таблица
+          </Button>
+          <Button
+            variant={tab === 'chart' ? 'primary' : 'secondary'}
+            onClick={() => setTab('chart')}
+          >
+            График
           </Button>
           <Button
             variant={tab === 'info' ? 'primary' : 'secondary'}
@@ -61,6 +124,12 @@ export function SheetViewerPage() {
       </header>
 
       <main className="max-w-full px-6 py-6">
+        {exportError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 max-w-lg mx-auto mb-4">
+            {exportError}
+          </div>
+        )}
+
         {loading && (
           <div className="flex justify-center py-20">
             <Spinner className="w-8 h-8 text-blue-600" />
@@ -74,7 +143,11 @@ export function SheetViewerPage() {
         )}
 
         {sheet && tab === 'table' && (
-          <TableView columns={sheet.columns} rows={sheet.rows} />
+          <TableView columns={sheet.columns} rows={rows} onCellEdit={handleCellEdit} />
+        )}
+
+        {sheet && tab === 'chart' && (
+          <ChartView columns={sheet.columns} rows={rows} />
         )}
 
         {sheet && tab === 'info' && (
