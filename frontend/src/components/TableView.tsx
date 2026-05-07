@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import type { Column, Row, SortConfig, CellValue } from '../types/spreadsheet'
 
 interface TableViewProps {
@@ -22,33 +22,41 @@ export function TableView({ columns, rows, onCellEdit }: TableViewProps) {
 
   const activeFilter = search.trim()
 
-  const filtered = rows
-    .map((row, sourceIndex) => ({ row, sourceIndex }))
-    .filter(({ row }) =>
-      activeFilter
-        ? columns.some((col) => {
-            const val = row[col.key]
-            return val != null && String(val).toLowerCase().includes(activeFilter.toLowerCase())
-          })
-        : true,
-    )
+  const filtered = useMemo(
+    () =>
+      rows
+        .map((row, sourceIndex) => ({ row, sourceIndex }))
+        .filter(({ row }) =>
+          activeFilter
+            ? columns.some((col) => {
+                const val = row[col.key]
+                return val != null && String(val).toLowerCase().includes(activeFilter.toLowerCase())
+              })
+            : true,
+        ),
+    [rows, columns, activeFilter],
+  )
 
-  const displayed = sort
-    ? [...filtered].sort((a, b) => {
-      const av = a.row[sort.key]
-      const bv = b.row[sort.key]
-      if (av === bv) return 0
-      const cmp =
-        av == null
-          ? -1
-          : bv == null
-            ? 1
-            : av < bv
-              ? -1
-              : 1
-      return sort.direction === 'asc' ? cmp : -cmp
-    })
-    : filtered
+  const displayed = useMemo(
+    () =>
+      sort
+        ? [...filtered].sort((a, b) => {
+            const av = a.row[sort.key]
+            const bv = b.row[sort.key]
+            if (av === bv) return 0
+            const cmp =
+              av == null
+                ? -1
+                : bv == null
+                  ? 1
+                  : av < bv
+                    ? -1
+                    : 1
+            return sort.direction === 'asc' ? cmp : -cmp
+          })
+        : filtered,
+    [filtered, sort],
+  )
 
   function toggleSort(key: string) {
     setSort((prev) => {
