@@ -56,7 +56,6 @@ export function useSheet(fileId: string, sheetName: string): UseSheetResult {
   useEffect(() => {
     const controller = new AbortController()
     dispatch({ type: 'FETCHING' })
-    setRows([])
     fetchSheet(controller.signal)
     return () => controller.abort()
   }, [fetchSheet])
