@@ -58,7 +58,24 @@ export async function getSheet(req: AuthRequest, res: Response, next: NextFuncti
   try {
     const id = String(req.params.id)
     const sheetName = String(req.params.sheetName)
-    const sheet = await filesService.readSheet({ fileId: id, userId: req.userId!, sheetName })
+    const pageValue = Number(req.query.page)
+    const pageSizeValue = Number(req.query.pageSize)
+    const page = Number.isFinite(pageValue) && pageValue > 0 ? Math.floor(pageValue) : undefined
+    const pageSize =
+      Number.isFinite(pageSizeValue) && pageSizeValue > 0 ? Math.floor(pageSizeValue) : undefined
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined
+    const sortBy = typeof req.query.sortBy === 'string' ? req.query.sortBy : undefined
+    const sortDir = req.query.sortDir === 'desc' ? 'desc' : req.query.sortDir === 'asc' ? 'asc' : undefined
+    const sheet = await filesService.readSheet({
+      fileId: id,
+      userId: req.userId!,
+      sheetName,
+      page,
+      pageSize,
+      search,
+      sortBy,
+      sortDir,
+    })
     res.json(sheet)
   } catch (err) {
     next(err)
